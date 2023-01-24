@@ -33,9 +33,11 @@ module.exports = (sequelize, DataTypes) => {
     expired_date: DataTypes.DATE,
     status: {
         type: DataTypes.STRING,
-        defaultValue: 'Waiting for Payment'
-    }
-  }, {
+        defaultValue: 'Waiting for'
+    
+  },
+  payment_proof: DataTypes.STRING
+ }, {
     sequelize,
     modelName: 'transactions',
   });

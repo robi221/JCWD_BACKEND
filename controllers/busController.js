@@ -14,6 +14,8 @@ const {hashPassword, hashMatch} = require('./../lib/hash')
 
 // Import jwt
 const {createToken} = require('./../lib/jwt')
+const transporter = require('./../helpers/transporter')
+
 
 module.exports = {
     search: async(req, res) => {
@@ -95,7 +97,7 @@ module.exports = {
 
             let dataToSend = []
             seat_number.forEach((value) => {
-                dataToSend.push({seat_number: value, pricr, transactions_id: insertId})
+                dataToSend.push({seat_number: value, price, transactions_id: insertId})
             })
 
             await transaction_details.bulkCreate(dataToSend, {transaction: t, ignoreDuplicates: true})
@@ -118,5 +120,52 @@ module.exports = {
             t.rollback()
             console.log(error)
         }
-    } 
+    },
+
+    payment: async(req, res) => {
+        // try {console.log('Masukkk')
+        const t = await sequelize.transaction()
+        try {
+            
+        // Step-1 Ambil id transaction dari req.params ---> Update status dari waiting for payment menjadi paid
+            let {transaction_id} = req.params
+
+        // Step-2 Simpan path image nya ke kolom payment proof sekaligus
+        // Update status transaction
+        await transactions.update({
+            payment_proof: req.files.images[0].path,
+            status: 'Paid'
+        },
+        {
+            where: {
+                id: transaction_id
+            }
+        },
+        {transaction: t})
+
+        // Step-3 Update status transaction
+
+        // Step-4 Hapus event scheduler 
+        await sequelize.query(`
+        DROP EVENT IF EXISTS change_status_transactions_${transaction_id}`)
+
+        // Step-5 Kirim invoice to users email
+        await transporter.sendMail({
+            from: 'Bus App',
+            to: 'robismicel12@gmail.com', 
+            subject: 'Invoice Transaction', 
+            html: '<h1>Transaction Success</h1>'
+        })
+        t.commit()
+        res.status(201).send({
+            isError: false, 
+            message: 'Transaction Success', 
+            data: null
+        })
+        } catch (error) {
+            t.rollback()
+            console.log(error)
+            // Step-6 Apabila ada step yang gagal, maka kita harus delete file nya
+        }
+    }
 }
